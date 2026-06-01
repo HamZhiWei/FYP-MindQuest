@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap');
+
+/* Chalkboard texture lines */
+body {
+  min-height: 100vh;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 29px,
+      rgba(255, 255, 255, 0.04) 30px
+    );
+}
+
+/* Wooden plank texture (used by ChalkButton) */
+.wood-texture {
+  background: linear-gradient(
+    180deg,
+    #7a4520 0%,
+    #5c3317 40%,
+    #4a2810 60%,
+    #5c3317 80%,
+    #7a4520 100%
+  );
+  border-top: 2px solid #a0622e;
+  border-bottom: 3px solid #2d1508;
+  border-left: 2px solid #6b3a1f;
+  border-right: 2px solid #2d1508;
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* Chalk scribble border (used by ChalkFrame) */
+.chalk-border {
+  border: 2px solid rgba(240, 236, 224, 0.5);
+  box-shadow:
+    0 0 0 1px rgba(240, 236, 224, 0.15),
+    inset 0 0 0 1px rgba(240, 236, 224, 0.08);
+}
+
+.wood-button {
+  width: 350px;
+  height: 95px;
+
+  background-image: url('/assets/ui/button/wood_button.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+
+  border: none;
+  cursor: pointer;
+
+  font-size: 2rem;
+  font-weight: bold;
+  color: white;
+
+  transition: transform 0.1s;
+}
+
+.wood-button:hover {
+  transform: scale(1.03);
+}
+
+.wood-button:active {
+  transform: scale(0.97);
+}
+
+.wood-button-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.wood-button-row .wood-button {
+  width: calc(50% - 0.5rem);
+  height: 85px;
+  font-size: 1.5rem;
+}
+
+/* Game-room background used by post-game React pages.
+   Replace the gradient with: background-image: url('/assets/ui/bg/bedroom.png');
+   background-size: cover; background-position: center;
+   once the asset is available. */
+.game-bg {
+  background: linear-gradient(135deg, #1a1008 0%, #2d1f0e 30%, #1e1a2a 70%, #0d0d1a 100%);
+}
