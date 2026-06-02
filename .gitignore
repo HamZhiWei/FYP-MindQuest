@@ -1,3 +1,20 @@
+#  Python / Flask backend 
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/.env
+backend/*.egg-info/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/instance/
+
+# Frontend 
+.env
+.env.local
+.env.*.local
+
 # Logs
 logs
 *.log
