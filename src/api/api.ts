@@ -22,7 +22,14 @@ export const initSession = async (profileData: ProfileData) => {
 export const submitSession = async (session: SessionData) =>
   axios.post(
     `${API_BASE}/sessions`,
-    { ...session, anonSessionToken: getSessionToken() },
+    { ...session, anonSessionToken: getSessionToken(), sessionId: getSessionId() },
+    { headers: headers() },
+  );
+
+export const submitProfile = async (profileData: ProfileData) =>
+  axios.post(
+    `${API_BASE}/profile`,
+    { ...profileData, sessionId: getSessionId() },
     { headers: headers() },
   );
 

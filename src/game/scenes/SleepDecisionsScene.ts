@@ -16,10 +16,26 @@ interface DecisionNode {
   choices: ChoiceOption[];
 }
 
-const SCENE_INTRO =
-  'You have a 9 AM lecture and a lab report due Thursday. ' +
-  "It's past midnight. You meant to be asleep an hour ago. Your phone is on your desk. " +
-  'The room is lit by your laptop screen.';
+const SCENE_INTRO_LINES = [
+  'You have a 9 AM lecture and a lab report due Thursday.',
+  "It's past midnight. You meant to be asleep an hour ago.",
+  'Your phone is on your desk.',
+  'The room is lit by your laptop screen.',
+];
+
+const INTRO_WORD_FADE_MS = 400;
+const INTRO_WORD_STAGGER_MS = 100;
+const INTRO_ROW_PAUSE_MS = 350;
+const INTRO_SENTENCE_GAP = 12;
+const BGM_VOLUME = 0.3;
+const START_PULSE_Y_OFFSET = 10;
+const START_PULSE_MS = 550;
+
+interface WoodButtonParts {
+  img: Phaser.GameObjects.Image;
+  txt: Phaser.GameObjects.Text;
+  zone: Phaser.GameObjects.Zone;
+}
 
 // A choices: low risk (+3%), B choices: mid risk (-7%), C choices: high risk (-15%)
 const ENERGY_DELTAS: Record<RiskLevel, number> = {
@@ -153,6 +169,8 @@ export default class SleepDecisionsScene extends Phaser.Scene {
   private currentNodeId: string = '';
   private nodeObjects: Phaser.GameObjects.GameObject[] = [];
   private backgroundImage?: Phaser.GameObjects.Image;
+  private bgm?: Phaser.Sound.BaseSound;
+  private startButtonPulseTargets: Phaser.GameObjects.GameObject[] = [];
 
   constructor() {
     super({ key: 'SleepDecisions' });
@@ -164,6 +182,7 @@ export default class SleepDecisionsScene extends Phaser.Scene {
     this.currentNodeId = '';
     this.nodeObjects = [];
     this.backgroundImage = undefined;
+    this.stopBgm();
   }
 
   preload(): void {
@@ -171,12 +190,31 @@ export default class SleepDecisionsScene extends Phaser.Scene {
       this.load.image(backgroundKey(i), backgroundPath(i));
     }
     this.load.image(WOOD_BUTTON_KEY, '/assets/ui/button/wood_button.png');
+    this.load.audio('btn-hover', '/assets/audio/hover.wav');
+    this.load.audio('btn-click', '/assets/audio/click.wav');
+    this.load.audio('clock-tick', '/assets/audio/clock-tick.wav');
   }
 
   create(): void {
+    this.events.once('shutdown', this.stopBgm, this);
+    this.startBgm();
     this.setBackground(INTRO_BG_INDEX);
     this.drawSceneBadge();
+    this.drawBackButton();
     this.showSceneIntro();
+  }
+
+  private startBgm(): void {
+    if (!this.cache.audio.exists('clock-tick')) return;
+    this.bgm = this.sound.add('clock-tick', { loop: true, volume: BGM_VOLUME });
+    this.bgm.play();
+  }
+
+  private stopBgm(): void {
+    if (this.bgm?.isPlaying) {
+      this.bgm.stop();
+    }
+    this.bgm = undefined;
   }
 
   private setBackground(nodeIndex: number): void {
@@ -204,11 +242,13 @@ export default class SleepDecisionsScene extends Phaser.Scene {
   }
 
   private drawSceneBadge(): void {
-    const badge = this.add.image(148, 52, WOOD_BUTTON_KEY);
+    const cx = this.scale.width / 2;
+    const cy = 52;
+    const badge = this.add.image(cx, cy, WOOD_BUTTON_KEY);
     badge.setDisplaySize(260, 72);
     badge.setDepth(UI_DEPTH);
 
-    this.add.text(148, 52, 'Sleep Decisions', {
+    this.add.text(cx, cy, 'Sleep Decisions', {
       fontSize: '22px',
       color: '#ffffff',
       fontFamily: CHALK_FONT,
@@ -216,7 +256,24 @@ export default class SleepDecisionsScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(UI_DEPTH + 1).disableInteractive();
   }
 
+  private drawBackButton(): void {
+    const margin = 24;
+    const btnW = 120;
+    const btnH = 52;
+    const y = 52 - btnH / 2;
+    this.drawWoodButton(
+      margin,
+      y,
+      btnW,
+      btnH,
+      'Back',
+      () => this.game.events.emit('navigateBack'),
+      true,
+    );
+  }
+
   private clearNodeObjects(): void {
+    this.stopStartButtonPulse();
     this.nodeObjects.forEach((obj) => obj.destroy());
     this.nodeObjects = [];
   }
@@ -233,44 +290,196 @@ export default class SleepDecisionsScene extends Phaser.Scene {
     const boxW = Math.floor(W * 0.88);
     const boxX = Math.floor((W - boxW) / 2);
     const pad = 28;
-
-    const body = this.add.text(0, 0, SCENE_INTRO, {
+    const textStyle: Phaser.Types.GameObjects.Text.TextStyle = {
       fontSize: '22px',
       color: DARK_BROWN,
       fontFamily: CHALK_FONT,
       fontStyle: 'bold',
       align: 'center',
-      wordWrap: { width: boxW - pad * 2 },
-      lineSpacing: 8,
-    }).setOrigin(0.5).setDepth(UI_DEPTH + 2);
-    this.nodeObjects.push(body);
+    };
 
-    const boxH = body.height + pad * 2 + 50;
+    const contentW = boxW - pad * 2;
+    const { totalHeight, lineLayouts } = this.measureIntroLines(SCENE_INTRO_LINES, contentW, textStyle);
+    const boxH = totalHeight + pad * 2 + 50;
     const boxTop = Math.floor((H - boxH) / 2) - 20;
-    body.setPosition(boxX + boxW / 2, boxTop + boxH / 2 - 20);
+    const textCenterX = boxX + boxW / 2;
+    const textStartY = boxTop + pad;
+
     this.drawParchmentBox(boxX, boxTop, boxW, boxH);
 
     const btnW = Math.min(200, Math.floor(boxW * 0.28));
     const btnH = 58;
     const btnY = boxTop + boxH + 20;
 
-    this.drawWoodButton(
-      boxX + 24,
-      btnY,
-      btnW,
-      btnH,
-      'Back',
-      () => this.game.events.emit('navigateBack'),
-    );
-
-    this.drawWoodButton(
-      boxX + boxW - btnW - 24,
+    const startBtn = this.drawWoodButton(
+      boxX + Math.floor((boxW - btnW) / 2),
       btnY,
       btnW,
       btnH,
       'Start',
-      () => this.showNode(0),
+      () => {
+        this.stopStartButtonPulse();
+        this.showNode(0);
+      },
     );
+
+    this.animateIntroLines(lineLayouts, textCenterX, textStartY, textStyle, () => {
+      this.startStartButtonPulse(startBtn);
+    });
+  }
+
+  private startStartButtonPulse(button: WoodButtonParts): void {
+    this.stopStartButtonPulse();
+    const txt = button.txt;
+    const baseY = txt.getData('pulseBaseY') as number;
+    txt.setY(baseY);
+    txt.setAlpha(1);
+    this.startButtonPulseTargets = [txt];
+
+    this.tweens.add({
+      targets: txt,
+      y: baseY - START_PULSE_Y_OFFSET,
+      alpha: 0.45,
+      duration: START_PULSE_MS,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  private stopStartButtonPulse(): void {
+    if (!this.startButtonPulseTargets.length) return;
+
+    const txt = this.startButtonPulseTargets[0] as Phaser.GameObjects.Text;
+    this.tweens.killTweensOf(txt);
+    const baseY = txt.getData('pulseBaseY') as number | undefined;
+    if (baseY !== undefined) txt.setY(baseY);
+    txt.setAlpha(1);
+    this.startButtonPulseTargets = [];
+  }
+
+  private measureIntroLines(
+    lines: string[],
+    maxWidth: number,
+    style: Phaser.Types.GameObjects.Text.TextStyle,
+  ): { totalHeight: number; lineLayouts: string[][] } {
+    const probe = this.make.text({ x: 0, y: 0, text: '', style, add: false });
+    probe.setWordWrapWidth(maxWidth);
+
+    const lineLayouts: string[][] = [];
+    let totalHeight = 0;
+    const lineSpacing = 8;
+
+    lines.forEach((line, lineIndex) => {
+      const rows = this.wrapLineIntoRows(line, maxWidth, style);
+      lineLayouts.push(rows);
+      rows.forEach((row) => {
+        probe.setText(row);
+        totalHeight += probe.height + lineSpacing;
+      });
+      if (lineIndex < lines.length - 1) {
+        totalHeight += INTRO_SENTENCE_GAP;
+      }
+    });
+
+    probe.destroy();
+    return { totalHeight, lineLayouts };
+  }
+
+  private wrapLineIntoRows(
+    line: string,
+    maxWidth: number,
+    style: Phaser.Types.GameObjects.Text.TextStyle,
+  ): string[] {
+    const probe = this.make.text({ x: 0, y: 0, text: '', style, add: false });
+    const words = line.split(' ');
+    const rows: string[] = [];
+    let current = '';
+
+    words.forEach((word) => {
+      const candidate = current ? `${current} ${word}` : word;
+      probe.setText(candidate);
+      if (probe.width > maxWidth && current) {
+        rows.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    });
+
+    if (current) rows.push(current);
+    probe.destroy();
+    return rows.length ? rows : [line];
+  }
+
+  private animateIntroLines(
+    lineLayouts: string[][],
+    centerX: number,
+    startY: number,
+    style: Phaser.Types.GameObjects.Text.TextStyle,
+    onComplete?: () => void,
+  ): number {
+    let y = startY;
+    let delay = 0;
+    const lineSpacing = 8;
+
+    lineLayouts.forEach((rows, lineIndex) => {
+      rows.forEach((row) => {
+        const rowHeight = this.animateIntroRow(row, centerX, y, style, delay);
+        delay += row.split(' ').length * INTRO_WORD_STAGGER_MS + INTRO_WORD_FADE_MS;
+        y += rowHeight + lineSpacing;
+      });
+
+      if (lineIndex < lineLayouts.length - 1) {
+        delay += INTRO_ROW_PAUSE_MS;
+        y += INTRO_SENTENCE_GAP;
+      }
+    });
+
+    if (onComplete) {
+      this.time.delayedCall(delay, onComplete);
+    }
+
+    return delay;
+  }
+
+  private animateIntroRow(
+    row: string,
+    centerX: number,
+    y: number,
+    style: Phaser.Types.GameObjects.Text.TextStyle,
+    startDelay: number,
+  ): number {
+    const words = row.split(' ');
+    const probes = words.map((word) =>
+      this.make.text({ x: 0, y: 0, text: `${word} `, style, add: false }),
+    );
+    const totalWidth = probes.reduce((sum, probe) => sum + probe.width, 0);
+    const rowHeight = probes[0]?.height ?? 22;
+
+    let x = centerX - totalWidth / 2;
+    words.forEach((word, i) => {
+      const wordText = this.add
+        .text(x, y, `${word}${i < words.length - 1 ? ' ' : ''}`, style)
+        .setOrigin(0, 0)
+        .setAlpha(0)
+        .setDepth(UI_DEPTH + 2);
+
+      this.nodeObjects.push(wordText);
+
+      this.tweens.add({
+        targets: wordText,
+        alpha: 1,
+        duration: INTRO_WORD_FADE_MS,
+        delay: startDelay + i * INTRO_WORD_STAGGER_MS,
+        ease: 'Sine.easeIn',
+      });
+
+      x += probes[i].width;
+      probes[i].destroy();
+    });
+
+    return rowHeight;
   }
 
   private showDecisionScreen(node: DecisionNode): void {
@@ -340,14 +549,15 @@ export default class SleepDecisionsScene extends Phaser.Scene {
     h: number,
     label: string,
     onClick: () => void,
-  ): void {
+    persistent = false,
+  ): WoodButtonParts {
     const cx = x + w / 2;
     const cy = y + h / 2;
 
     const img = this.add.image(cx, cy, WOOD_BUTTON_KEY);
     img.setDisplaySize(w, h);
     img.setDepth(UI_DEPTH + 3);
-    this.nodeObjects.push(img);
+    if (!persistent) this.nodeObjects.push(img);
 
     const txt = this.add.text(cx, cy, label, {
       fontSize: '22px',
@@ -355,19 +565,23 @@ export default class SleepDecisionsScene extends Phaser.Scene {
       fontFamily: CHALK_FONT,
       fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(UI_DEPTH + 4);
-    this.nodeObjects.push(txt);
+    txt.setData('pulseBaseY', cy);
+    if (!persistent) this.nodeObjects.push(txt);
 
     const zone = this.add
       .zone(cx, cy, w, h)
       .setInteractive({ useHandCursor: true })
       .setDepth(UI_DEPTH + 5);
 
+    zone.on('pointerover', () => this.sound.play('btn-hover'));
     zone.on('pointerdown', () => {
       zone.disableInteractive();
+      this.sound.play('btn-click');
       onClick();
     });
 
-    this.nodeObjects.push(zone);
+    if (!persistent) this.nodeObjects.push(zone);
+    return { img, txt, zone };
   }
 
   private drawChoicePill(
@@ -409,6 +623,7 @@ export default class SleepDecisionsScene extends Phaser.Scene {
     zone.on('pointerout', () => paint(0.82));
     zone.on('pointerdown', () => {
       zone.disableInteractive();
+      this.sound.play('btn-click');
       onClick();
     });
 

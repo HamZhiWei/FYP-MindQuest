@@ -2,12 +2,13 @@ import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Phaser from 'phaser';
 import type { ScenarioId, SessionData } from '../types';
-import GameManager from '../game/GameManager';
-import { useGame } from '../context/GameContext';
-import EnergyBar from '../components/EnergyBar';
-import AssignmentDeadlineScene from '../game/scenes/AssignmentDeadlineScene';
-import SleepDecisionsScene from '../game/scenes/SleepDecisionsScene';
-import SocialInteractionScene from '../game/scenes/SocialInteractionScene';
+import GameManager from '@/game/GameManager';
+import { useGame } from '@/context/GameContext';
+import EnergyBar from '@/components/EnergyBar';
+import AssignmentDeadlineScene from '@/game/scenes/AssignmentDeadlineScene';
+import SleepDecisionsScene from '@/game/scenes/SleepDecisionsScene';
+import SocialInteractionScene from '@/game/scenes/SocialInteractionScene';
+import { submitSession } from '@/api/api';
 
 // Map each scenarioId to the Phaser scene class that implements it.
 // Add entries here as new scenarios are built.
@@ -17,8 +18,7 @@ const SCENE_MAP: Partial<Record<ScenarioId, new () => Phaser.Scene>> = {
   'social-interaction': SocialInteractionScene,
 };
 
-// ─── GamePage ────────────────────────────────────────────────────────────────
-
+// GamePage 
 export default function GamePage() {
   const { scenarioId } = useParams<{ scenarioId: string }>();
   const navigate = useNavigate();
@@ -67,21 +67,22 @@ export default function GamePage() {
       setEnergyRef.current(GameManager.getEnergyLevel());
     });
 
-    game.events.on('gameComplete', (session: SessionData) => {
+    const handleGameComplete = async (session: SessionData) => {
       setSessionDataRef.current(session);
       if (SCENE_MAP[session.scenarioId as ScenarioId]) {
         setSelectedScenarioRef.current(session.scenarioId as ScenarioId);
       }
+      try {
+        const res = await submitSession(session);
+        sessionStorage.setItem('sessionId', res.data.sessionId);
+      } catch (err) {
+        console.error('Session submission failed:', err);
+      }
       navigateRef.current('/advise');
-    });
+    };
 
-    game.events.on('sceneComplete', (session: SessionData) => {
-      setSessionDataRef.current(session);
-      if (SCENE_MAP[session.scenarioId as ScenarioId]) {
-        setSelectedScenarioRef.current(session.scenarioId as ScenarioId);
-      }
-      navigateRef.current('/advise');
-    });
+    game.events.on('gameComplete', handleGameComplete);
+    game.events.on('sceneComplete', handleGameComplete);
 
     game.events.on('navigateBack', () => {
       navigateRef.current('/scenarios');
@@ -93,8 +94,8 @@ export default function GamePage() {
 
     return () => {
       game.events.off('updateEnergy');
-      game.events.off('gameComplete');
-      game.events.off('sceneComplete');
+      game.events.off('gameComplete', handleGameComplete);
+      game.events.off('sceneComplete', handleGameComplete);
       game.events.off('navigateBack');
       game.events.off('navigateTo');
       game.destroy(true);

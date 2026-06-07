@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import WoodButton from '../components/WoodButton';
-import ChalkFrame from '../components/ChalkFrame';
-import { useGame } from '../context/GameContext';
-import type { ScenarioId } from '../types';
+import WoodButton from '@/components/WoodButton';
+import ChalkFrame from '@/components/ChalkFrame';
+import { useGame } from '@/context/GameContext';
+import type { ScenarioId } from '@/types';
 
 const SCENARIO_LABELS: Record<ScenarioId, string> = {
   'assignment-deadline': 'Assignment Deadline',

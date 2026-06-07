@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGame } from '../context/GameContext';
-import type { PSS10Answer } from '../types';
+import { useGame } from '@/context/GameContext';
+import type { PSS10Answer } from '@/types';
+
+const clickSound = new Audio('/assets/audio/click.wav');
+const ADVANCE_DELAY_MS = 220;
 
 const QUESTIONS: string[] = [
   'In the last month, how often have you Been upset because of something that happened unexpectedly?',
@@ -30,30 +33,51 @@ export default function PSS10Page() {
 
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(
-    Array(QUESTIONS.length).fill(null)
+    Array(QUESTIONS.length).fill(null),
   );
+  const [isAdvancing, setIsAdvancing] = useState(false);
+  const [showSelectTip, setShowSelectTip] = useState(false);
 
   const selected = answers[current];
   const isLast = current === QUESTIONS.length - 1;
+  const canProceed = selected !== null && !isAdvancing;
+
+  useEffect(() => {
+    setShowSelectTip(false);
+  }, [current]);
 
   function handleSelect(value: number) {
-    setAnswers(prev => {
-      const next = [...prev];
-      next[current] = value;
-      return next;
-    });
-  }
+    if (isAdvancing) return;
 
-  function handleBack() {
-    if (current === 0) {
-      navigate('/pilot-study');
-    } else {
-      setCurrent(c => c - 1);
-    }
+    setShowSelectTip(false);
+
+    clickSound.currentTime = 0;
+    clickSound.play().catch(() => {});
+
+    const nextAnswers = [...answers];
+    nextAnswers[current] = value;
+    setAnswers(nextAnswers);
+
+    if (isLast) return;
+
+    setIsAdvancing(true);
+    window.setTimeout(() => {
+      setCurrent(c => c + 1);
+      setIsAdvancing(false);
+    }, ADVANCE_DELAY_MS);
   }
 
   function handleNext() {
-    if (selected === null) return;
+    if (isAdvancing) return;
+
+    if (selected === null) {
+      setShowSelectTip(true);
+      return;
+    }
+
+    clickSound.currentTime = 0;
+    clickSound.play().catch(() => {});
+
     if (isLast) {
       const completed: PSS10Answer[] = answers.map((ans, i) => ({
         questionId: i + 1,
@@ -63,6 +87,17 @@ export default function PSS10Page() {
       navigate('/done');
     } else {
       setCurrent(c => c + 1);
+    }
+  }
+
+  function handleBack() {
+    if (isAdvancing) return;
+    clickSound.currentTime = 0;
+    clickSound.play().catch(() => {});
+    if (current === 0) {
+      navigate('/pilot-study');
+    } else {
+      setCurrent(c => c - 1);
     }
   }
 
@@ -87,14 +122,21 @@ export default function PSS10Page() {
         </p>
 
         {/* Options */}
-        <div className="flex flex-col gap-4 mb-10">
+        <div
+          className={[
+            'flex flex-col gap-4 mb-4 rounded-lg transition-shadow',
+            showSelectTip ? 'ring-2 ring-amber-600/60 ring-offset-2 ring-offset-transparent' : '',
+          ].join(' ')}
+        >
           {OPTIONS.map((opt) => {
             const isSelected = selected === opt.value;
             return (
               <button
                 key={opt.value}
+                type="button"
+                disabled={isAdvancing}
                 onClick={() => handleSelect(opt.value)}
-                className="flex items-center gap-4 text-left w-full group"
+                className="flex items-center gap-4 text-left w-full group disabled:opacity-70"
               >
                 {/* Custom radio circle */}
                 <span
@@ -122,24 +164,38 @@ export default function PSS10Page() {
           })}
         </div>
 
+        {showSelectTip && (
+          <p
+            role="alert"
+            className="mb-6 text-center text-sm font-semibold text-amber-900 bg-amber-100/90 border border-amber-300/80 rounded-lg px-4 py-2.5"
+          >
+            Please tap one option above before pressing {isLast ? 'Submit' : 'Next'}.
+          </p>
+        )}
+
+        {!showSelectTip && <div className="mb-6" />}
+
         {/* Navigation */}
         <div className="flex items-center justify-between">
           <button
+            type="button"
             onClick={handleBack}
-            className="flex items-center gap-2 font-chalk text-lg text-[#5c3317] hover:text-wood-brown transition-colors"
+            disabled={isAdvancing}
+            className="flex items-center gap-2 font-chalk text-lg text-[#5c3317] hover:text-wood-brown transition-colors disabled:opacity-50"
           >
             <span className="text-xl">←</span>
             <span>Back</span>
           </button>
 
           <button
+            type="button"
             onClick={handleNext}
-            disabled={selected === null}
+            aria-disabled={!canProceed}
             className={[
               'flex items-center gap-2 font-chalk text-lg font-bold transition-all',
-              selected === null
-                ? 'text-[#5c3317]/40 cursor-not-allowed'
-                : 'text-wood-brown hover:text-[#3d2210]',
+              canProceed
+                ? 'text-wood-brown hover:text-[#3d2210]'
+                : 'text-[#5c3317]/40 cursor-not-allowed',
             ].join(' ')}
           >
             <span>{isLast ? 'Submit' : 'Next'}</span>

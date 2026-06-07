@@ -1,48 +1,41 @@
-import { type ChangeEvent } from 'react';
+import { useState } from 'react';
+
+const hoverSound = new Audio('/assets/audio/hover.wav');
+const clickSound = new Audio('/assets/audio/click.wav');
 import { useNavigate } from 'react-router-dom';
-import WoodButton from '../components/WoodButton';
-import ChalkFrame from '../components/ChalkFrame';
-import { useGame } from '../context/GameContext';
-import type { ProfileData } from '../types';
-
-interface SelectFieldProps {
-  label: string;
-  field: keyof ProfileData;
-  value: string;
-  options: string[];
-  onChange: (field: keyof ProfileData, value: string) => void;
-}
-
-function SelectField({ label, field, value, options, onChange }: SelectFieldProps) {
-  return (
-    <div className="flex flex-col gap-1 w-full">
-      <label className="font-chalk text-chalk-white text-lg">{label}</label>
-      <select
-        value={value}
-        onChange={(e: ChangeEvent<HTMLSelectElement>) => onChange(field, e.target.value)}
-        className="bg-chalk-green-dark text-chalk-white font-chalk border border-chalk-white/50 rounded p-2 w-full focus:outline-none focus:ring-2 focus:ring-chalk-white/40"
-      >
-        <option value="">— select —</option>
-        {options.map((opt) => (
-          <option key={opt} value={opt}>{opt}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
+import WoodButton from '@/components/WoodButton';
+import ChalkFrame from '@/components/ChalkFrame';
+import SelectField from '@/components/SelectField';
+import { useGame } from '@/context/GameContext';
+import { submitProfile } from '@/api/api';
+import type { ProfileData } from '@/types';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
 const AGE_OPTIONS = ['18–20', '21–23', '24–26', '27+'];
-const FACULTY_OPTIONS = ['Computing', 'Engineering', 'Science', 'Business', 'Arts', 'Other'];
+const FACULTY_OPTIONS = ['Faculty of Built Environment', 'Faculty of Languages and Linguistics', 'Faculty of Pharmacy', 'Faculty of Engineering', 'Faculty of Education', 'Faculty of Dentistry','Faculty of Business and Economics','Faculty of Medicine','Faculty of Science',''];
 const YEAR_OPTIONS = ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Postgraduate'];
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { profileData, setProfileData } = useGame();
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (field: keyof ProfileData, value: string) => {
     setProfileData({ ...profileData, [field]: value });
   };
+
+  async function handleNext() {
+    setLoading(true);
+    try {
+      await submitProfile(profileData);
+    } catch {
+      // Non-blocking — profile is already in context; game can still proceed
+      console.warn('Profile submission failed, continuing anyway');
+    } finally {
+      setLoading(false);
+      navigate('/scenarios');
+    }
+  }
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-chalk-green text-chalk-white font-chalk p-8">
@@ -86,7 +79,9 @@ export default function ProfilePage() {
           </div>
           <div className="flex items-center gap-6">
             <button
-              onClick={() => navigate('/scenarios')}
+              onMouseEnter={() => { hoverSound.currentTime = 0; hoverSound.play().catch(() => {}); }}
+              onClick={() => { clickSound.currentTime = 0; clickSound.play().catch(() => {}); navigate('/scenarios'); }}
+              
               className="font-chalk text-chalk-white text-lg underline underline-offset-2 opacity-70 hover:opacity-100 transition-opacity"
             >
               Skip
@@ -95,7 +90,7 @@ export default function ProfilePage() {
           </div>
           <div className="wood-button-row">
               <WoodButton label="Back" onClick={() => navigate('/consent')} />
-              <WoodButton label="Next" onClick={() => navigate('/scenarios')} />
+              <WoodButton label={loading ? 'Saving…' : 'Next'} onClick={handleNext} disabled={loading} />
             </div>
         </ChalkFrame>
       </div>

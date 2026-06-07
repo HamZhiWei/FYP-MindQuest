@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { useGame } from '../context/GameContext';
-import WoodButton from '../components/WoodButton';
-import EnergyBar from '../components/EnergyBar';
+import { useGame } from '@/context/GameContext';
+import WoodButton from '@/components/WoodButton';
+import EnergyBar from '@/components/EnergyBar';
 
 const TIPS: string[] = [
   'Take short breaks between tasks — even 5 minutes helps reset your focus.',

@@ -30,6 +30,14 @@ export type ScenarioId =
   | 'sleep-decisions'
   | 'social-interaction';
 
+export interface ScenarioMeta {
+  id: ScenarioId;
+  badge: string;
+  label: string;
+  description: string;
+  image: string;
+}
+
 export type RiskBand = 'LOW' | 'MODERATE' | 'HIGH';
 
 export interface SceneData {

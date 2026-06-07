@@ -1,34 +1,42 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGame } from '../context/GameContext';
-import { submitSession, submitPSS10 } from '../api/api';
+import { useGame } from '@/context/GameContext';
+import { submitPSS10 } from '@/api/api';
+const clickSound = new Audio('/assets/audio/click.wav');
 
 type SubmitStatus = 'loading' | 'success' | 'error';
 
 export default function DonePage() {
   const navigate = useNavigate();
-  const { sessionData, pss10Answers } = useGame();
-  const [status, setStatus] = useState<SubmitStatus>('loading');
-
-  const doSubmit = useCallback(async () => {
-    setStatus('loading');
-    try {
-      if (sessionData) {
-        await submitSession(sessionData);
-      }
-      if (pss10Answers.length > 0) {
-        await submitPSS10(pss10Answers);
-      }
-      setStatus('success');
-    } catch (err) {
-      console.error('Submission failed:', err);
-      setStatus('error');
-    }
-  }, [sessionData, pss10Answers]);
+  const { pss10Answers } = useGame();
+  const [status, setStatus] = useState<SubmitStatus>(
+    pss10Answers.length > 0 ? 'loading' : 'success'
+  );
+  const submitted = useRef(false);
 
   useEffect(() => {
-    doSubmit();
-  }, [doSubmit]);
+    if (pss10Answers.length === 0) return;  // no PSS-10, nothing to submit
+    if (submitted.current) return;          // guard against Strict Mode double-run
+    submitted.current = true;
+
+    submitPSS10(pss10Answers)
+      .then(() => setStatus('success'))
+      .catch((err) => {
+        console.error('PSS-10 submission failed:', err);
+        setStatus('error');
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleRetry() {
+    submitted.current = false;
+    setStatus('loading');
+    submitPSS10(pss10Answers)
+      .then(() => setStatus('success'))
+      .catch((err) => {
+        console.error('PSS-10 retry failed:', err);
+        setStatus('error');
+      });
+  }
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-chalk-green text-chalk-white font-chalk p-8 text-center">
@@ -68,7 +76,7 @@ export default function DonePage() {
               Submission failed, please try again.
             </p>
             <button
-              onClick={doSubmit}
+              onClick={handleRetry}
               className="font-chalk font-bold text-wood-brown underline underline-offset-4 hover:text-[#3d2210] transition-colors"
             >
               Retry
@@ -78,7 +86,7 @@ export default function DonePage() {
 
         {status !== 'loading' && (
           <button
-            onClick={() => navigate('/')}
+            onClick={() => {  clickSound.currentTime = 0; clickSound.play().catch(() => {}); navigate('/scenarios'); }}
             className="inline-flex items-center gap-2 font-chalk font-bold text-lg text-wood-brown underline underline-offset-4 hover:text-[#3d2210] transition-colors"
           >
             Go to Main Page

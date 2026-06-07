@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import WoodButton from '../components/WoodButton';
-import ChalkFrame from '../components/ChalkFrame';
-import { initSession } from '../api/api';
+import WoodButton from '@/components/WoodButton';
+import ChalkFrame from '@/components/ChalkFrame';
+import { initSession } from '@/api/api';
+
+const clickSound = new Audio('/assets/audio/click.wav');
 
 const CONSENT_POINTS: string[] = [
   'Your responses are anonymous',
@@ -16,9 +18,17 @@ export default function ConsentPage() {
   const [agreed, setAgreed] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [showConsentTip, setShowConsentTip] = useState(false);
 
   async function handleNext() {
-    if (!agreed || loading) return;
+    if (loading) return;
+
+    if (!agreed) {
+      setShowConsentTip(true);
+      return;
+    }
+
+    setShowConsentTip(false);
     setLoading(true);
     setError('');
     try {
@@ -48,15 +58,36 @@ export default function ConsentPage() {
           <p className="text-xl text-chalk-white mb-6">
             By continuing, you agree to participate in this study.
           </p>
-          <label className="flex items-center gap-3 text-xl text-chalk-white mb-6 cursor-pointer select-none">
+
+          <label
+            className={[
+              'flex items-center gap-3 text-xl text-chalk-white mb-4 cursor-pointer select-none',
+              'rounded-lg p-2 -mx-2 transition-shadow',
+              showConsentTip ? 'ring-2 ring-parchment-light/90 ring-offset-2 ring-offset-chalk-green' : '',
+            ].join(' ')}
+          >
             <input
               type="checkbox"
               checked={agreed}
-              onChange={(e) => setAgreed(e.target.checked)}
+              onChange={(e) => {
+                clickSound.currentTime = 0;
+                clickSound.play().catch(() => {});
+                setAgreed(e.target.checked);
+                if (e.target.checked) setShowConsentTip(false);
+              }}
               className="w-5 h-5 accent-wood-brown cursor-pointer"
             />
             I understand and agree
           </label>
+
+          {showConsentTip && (
+            <p
+              role="alert"
+              className="mb-4 text-center text-base font-semibold text-chalk-white/80 px-4"
+            >
+              Please tick &ldquo;I understand and agree&rdquo; before continuing.
+            </p>
+          )}
 
           {error && (
             <p className="text-red-400 text-sm mb-4">{error}</p>
@@ -67,7 +98,7 @@ export default function ConsentPage() {
             <WoodButton
               label={loading ? 'Please wait…' : 'Next'}
               onClick={handleNext}
-              disabled={!agreed || loading}
+              disabled={loading}
             />
           </div>
         </ChalkFrame>

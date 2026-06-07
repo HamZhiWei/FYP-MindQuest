@@ -1,3 +1,6 @@
+const hoverSound = new Audio('/assets/audio/hover.wav');
+const clickSound = new Audio('/assets/audio/click.wav');
+
 interface WoodButtonProps {
   label: string;
   onClick: () => void;
@@ -15,9 +18,23 @@ export default function WoodButton({
   height,
   fontSize,
 }: WoodButtonProps) {
+  function handleMouseEnter() {
+    if (disabled) return;
+    hoverSound.currentTime = 0;
+    hoverSound.play().catch(() => {});
+  }
+
+  function handleClick() {
+    if (disabled) return;
+    clickSound.currentTime = 0;
+    clickSound.play().catch(() => {});
+    onClick();
+  }
+
   return (
     <button
-      onClick={onClick}
+      onMouseEnter={handleMouseEnter}
+      onClick={handleClick}
       disabled={disabled}
       className="wood-button"
       style={{

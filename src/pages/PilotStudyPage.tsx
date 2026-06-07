@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGame } from '../context/GameContext';
-import type { ScenarioId } from '../types';
+import { useGame } from '@/context/GameContext';
+import type { ScenarioId } from '@/types';
+
+const clickSound = new Audio('/assets/audio/click.wav');
 
 const PAPER_BG = '/assets/ui/paper.png';
 
@@ -70,7 +72,7 @@ export default function PilotStudyPage() {
             <input
               type="checkbox"
               checked={agreed}
-              onChange={(e) => setAgreed(e.target.checked)}
+              onChange={(e) => {  clickSound.currentTime = 0; clickSound.play().catch(() => {}); setAgreed(e.target.checked); }}
               className="h-5 w-5 shrink-0 cursor-pointer accent-wood-brown"
             />
             I Understand and Agree
@@ -78,7 +80,11 @@ export default function PilotStudyPage() {
 
           <button
             type="button"
-            onClick={() => navigate('/pss10')}
+            onClick={() => {
+              clickSound.currentTime = 0;
+              clickSound.play().catch(() => {});
+              navigate('/pss10');
+            }}
             disabled={!agreed}
             className="inline-flex items-center gap-2 text-lg font-bold text-wood-brown transition-opacity disabled:cursor-not-allowed disabled:opacity-40 hover:text-[#3d2210] enabled:hover:opacity-90"
           >
@@ -89,7 +95,12 @@ export default function PilotStudyPage() {
 
         <button
           type="button"
-          onClick={() => navigate('/done')}
+          
+          onClick={() => {
+            clickSound.currentTime = 0;
+            clickSound.play().catch(() => {});
+            navigate('/done');
+          }}
           className="mt-5 w-full text-center text-sm font-bold text-[#5c3317] underline underline-offset-2 opacity-70 transition-opacity hover:opacity-100"
         >
           No thanks, skip

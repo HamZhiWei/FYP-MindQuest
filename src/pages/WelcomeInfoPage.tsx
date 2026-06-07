@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import WoodButton from '../components/WoodButton';
-import ChalkFrame from '../components/ChalkFrame';
+import WoodButton from '@/components/WoodButton';
+import ChalkFrame from '@/components/ChalkFrame';
 
 export default function WelcomeInfoPage() {
   const navigate = useNavigate();
