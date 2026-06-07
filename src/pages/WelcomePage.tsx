@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import WoodButton from '../components/WoodButton';
+import WoodButton from '@/components/WoodButton';
 
 const imageSrc = '/assets/ui/logo.png';
 
