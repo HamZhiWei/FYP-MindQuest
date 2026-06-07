@@ -3,9 +3,7 @@ from models.game_session import GameSession
 from models.wellbeing_score import WellbeingScore
 from models.scoring_weight import ScoringWeight
 
-# ---------------------------------------------------------------------------
 # Choice registry — maps (scenario, node, choice_key) → raw indicator deltas
-# ---------------------------------------------------------------------------
 CHOICE_REGISTRY = {
     'assignment-deadline': {
         'D1': {
@@ -103,7 +101,7 @@ class WellbeingScorer:
         if not weights:
             raise RuntimeError('No active ScoringWeight found in database')
 
-        # ── Step 1: aggregate raw indicator scores from registry ──────────
+        # Step 1: aggregate raw indicator scores from registry
         raw: dict[str, float] = {k: 0.0 for k in MAX_RAW}
 
         for choice in choices:
@@ -117,7 +115,7 @@ class WellbeingScorer:
                 if indicator in raw:
                     raw[indicator] += value
 
-        # ── Step 2: reaction-time → anxiety proxy ─────────────────────────
+        # Step 2: reaction-time → anxiety proxy
         if choices:
             avg_rt = sum(c.get('reactionTimeMs', 0) for c in choices) / len(choices)
         else:
@@ -132,11 +130,11 @@ class WellbeingScorer:
         else:
             raw['anxiety_rt'] = 10.0
 
-        # ── Step 3: normalise each indicator to 0–10 ─────────────────────
+        # Step 3: normalise each indicator to 0–10 
         def norm(key: str) -> float:
             return min(10.0, max(0.0, round(raw[key] / MAX_RAW[key] * 10, 2)))
 
-        # ── Step 4: per-scenario composite index ──────────────────────────
+        # Step 4: per-scenario composite index 
         iw = weights.indicator_weights
         scenario = session.scenario_id
 
@@ -165,7 +163,7 @@ class WellbeingScorer:
 
         composite = round(min(10.0, max(0.0, composite)), 2)
 
-        # ── Step 5: risk band ─────────────────────────────────────────────
+        # Step 5: risk band 
         if composite <= weights.risk_band_low_max:
             band = 'LOW'
         elif composite <= weights.risk_band_mod_max:
@@ -173,7 +171,7 @@ class WellbeingScorer:
         else:
             band = 'HIGH'
 
-        # ── Step 6: build WellbeingScore (caller commits) ─────────────────
+        # Step 6: build WellbeingScore (caller commits) 
         return WellbeingScore(
             session_id=session.id,
             avoidance_score=norm('avoidance'),

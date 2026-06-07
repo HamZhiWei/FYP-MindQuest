@@ -6,12 +6,30 @@ from extensions import db
 from models import GameSession, DecisionEvent
 from services.wellbeing_scorer import WellbeingScorer
 from services.gaming_detector import GamingDetector
+from utils.semester import semester_week_of, time_of_day_bucket
 
 sessions_bp = Blueprint('sessions', __name__)
 
 
+def _get_semester_weeks():
+    from models.study_config import StudyConfig
+    cfg = db.session.get(StudyConfig, 1)
+    return cfg.semester_weeks if cfg else None
+
+_YEAR_MAP = {'Year 1': 1, 'Year 2': 2, 'Year 3': 3, 'Year 4': 4, 'Postgraduate': 5}
+
+
 def _now():
     return datetime.now(timezone.utc)
+
+
+def _parse_year(value) -> int | None:
+    """Accept 'Year 1'/'Year 2'/… strings or plain integers."""
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    return _YEAR_MAP.get(str(value))
 
 
 @sessions_bp.route('/sessions/init', methods=['POST'])
@@ -21,13 +39,6 @@ def init_session():
         profile = data.get('profileData', {})
         anon_token = data.get('anonSessionToken') or str(uuid.uuid4())
 
-        year = profile.get('yearOfStudy')
-        if year is not None:
-            try:
-                year = int(year)
-            except (ValueError, TypeError):
-                return jsonify({'error': 'yearOfStudy must be an integer'}), 400
-
         session = GameSession(
             scenario_id=data.get('scenarioId') or 'unknown',
             anon_session_token=anon_token,
@@ -35,7 +46,7 @@ def init_session():
             gender=profile.get('gender'),
             age_group=profile.get('ageGroup'),
             faculty=profile.get('faculty'),
-            year_of_study=year,
+            year_of_study=_parse_year(profile.get('yearOfStudy')),
         )
         db.session.add(session)
         db.session.commit()
@@ -73,6 +84,11 @@ def submit_session():
             or str(uuid.uuid4())
         )
 
+        # Look up the init session (profile holder) to copy demographics
+        init_id = data.get('sessionId')
+        init_session = db.session.get(GameSession, init_id) if init_id else None
+
+        # Always create a fresh row per scenario run so multiple plays don't collide
         session = GameSession(
             scenario_id=data['scenarioId'],
             anon_session_token=anon_token,
@@ -80,8 +96,16 @@ def submit_session():
             ended_at=ended_at,
             completed=data.get('completed', True),
             total_decisions_made=len(choices),
+            semester_week=semester_week_of(started_at, _get_semester_weeks()),
+            time_of_day_bucket=time_of_day_bucket(started_at),
+            # Copy profile from init session if available
+            gender=init_session.gender if init_session else None,
+            age_group=init_session.age_group if init_session else None,
+            faculty=init_session.faculty if init_session else None,
+            year_of_study=init_session.year_of_study if init_session else None,
         )
         db.session.add(session)
+        db.session.flush()  # ensures session.id is set before child rows reference it
 
         for choice in choices:
             if not choice.get('nodeId'):
@@ -123,12 +147,7 @@ def submit_profile():
         data = request.get_json(silent=True) or {}
         session_id = data.get('sessionId') or request.headers.get('X-Session-ID')
 
-        year = data.get('yearOfStudy')
-        if year is not None:
-            try:
-                year = int(year)
-            except (ValueError, TypeError):
-                return jsonify({'error': 'yearOfStudy must be an integer'}), 400
+        year = _parse_year(data.get('yearOfStudy'))
 
         if session_id:
             session = db.session.get(GameSession, session_id)
@@ -156,6 +175,38 @@ def submit_profile():
         db.session.commit()
         return jsonify({'ok': True, 'sessionId': session.id}), 201
 
+    except Exception:
+        traceback.print_exc()
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@sessions_bp.route('/sessions/<session_id>/flag-review', methods=['PATCH'])
+def flag_review(session_id):
+    try:
+        from routes.auth import require_admin
+        from utils.audit import write_audit
+        from flask import g
+
+        @require_admin
+        def _inner():
+            data     = request.get_json(silent=True) or {}
+            decision = data.get('decision')
+            if decision not in ('keep', 'exclude'):
+                return jsonify({'error': 'decision must be "keep" or "exclude"'}), 400
+            session = db.get_or_404(GameSession, session_id)
+            if decision == 'exclude':
+                session.flagged_as_invalid = True
+                session.flag_reason = (session.flag_reason or '') + ' [excluded by admin]'
+            else:
+                session.flagged_as_invalid = False
+                session.flag_reason        = None
+            write_audit('FLAG_REVIEWED', entity_type='game_sessions',
+                        entity_id=session_id, performed_by=g.current_user,
+                        details={'decision': decision})
+            db.session.commit()
+            return jsonify({'ok': True, 'decision': decision})
+
+        return _inner()
     except Exception:
         traceback.print_exc()
         return jsonify({'error': 'Internal server error'}), 500

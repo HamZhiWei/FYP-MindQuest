@@ -11,9 +11,12 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'dev-secret-change-in-production')
-
     FLASK_ENV = os.getenv('FLASK_ENV', 'development')
 
     _origins = os.getenv('CORS_ORIGINS', 'http://localhost:5173')
     CORS_ORIGINS = [o.strip() for o in _origins.split(',')]
+
+    KEYCLOAK_URL       = os.getenv('KEYCLOAK_URL',       'http://localhost:8180')
+    KEYCLOAK_REALM     = os.getenv('KEYCLOAK_REALM',     'mindquest')
+    KEYCLOAK_CLIENT_ID = os.getenv('KEYCLOAK_CLIENT_ID', 'dashboard-app')
+

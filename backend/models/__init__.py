@@ -5,6 +5,8 @@ from .pss10_response import PSS10Response
 from .scoring_weight import ScoringWeight
 from .audit_log import AuditLog
 from .user import User
+from .wellbeing_tip import WellbeingTip
+from .study_config import StudyConfig
 
 __all__ = [
     'GameSession',
@@ -14,4 +16,6 @@ __all__ = [
     'ScoringWeight',
     'AuditLog',
     'User',
+    'WellbeingTip',
+    'StudyConfig',
 ]
