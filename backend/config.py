@@ -13,7 +13,7 @@ class Config:
 
     FLASK_ENV = os.getenv('FLASK_ENV', 'development')
 
-    _origins = os.getenv('CORS_ORIGINS', 'http://localhost:5173')
+    _origins = os.getenv('CORS_ORIGINS', 'http://localhost:4173')
     CORS_ORIGINS = [o.strip() for o in _origins.split(',')]
 
     KEYCLOAK_URL       = os.getenv('KEYCLOAK_URL',       'http://localhost:8180')

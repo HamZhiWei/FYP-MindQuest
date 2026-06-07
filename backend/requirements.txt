@@ -5,3 +5,4 @@ python-keycloak
 PyJWT[crypto]
 psycopg2-binary
 python-dotenv
+gunicorn
